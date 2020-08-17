@@ -381,6 +381,9 @@ Press space to continue""" % self.score)
     self.needs_actions = False
     self.actions = new_actions
     #print(self.actions)
+    
+  def set_gameover(self):
+    self.gameover = True
 
 if __name__ == '__main__':
   App = TetrisApp()

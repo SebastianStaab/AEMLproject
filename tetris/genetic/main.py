@@ -38,8 +38,8 @@ ai = TetrisAI(app)
 
 threading.Thread(target=app.run).start()
 
-ai.start(seed=(-0.525, -0.284, -0.685, 0.873))
-#ai.start(20)
+ai.start(max_stones=200, seed=(-0.525, -0.284, -0.685, 0.873))
+#ai.start(num_units=20, max_gen=2)
 
 
 

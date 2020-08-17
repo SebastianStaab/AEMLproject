@@ -1,7 +1,7 @@
 
 
 from collections import defaultdict, OrderedDict
-import pygame, numpy, time, threading, random
+import pygame, numpy, time, threading, random, sys, math
 
 # Rotates a shape clockwise
 def rotate_clockwise(shape):
@@ -96,35 +96,44 @@ class TetrisAI(object):
     Keyboard/Action controller
   '''
 
-  def make_move(self, training=True):
+  def make_move(self, num_stones=0, training=True):
     
     while True:
+      
       cur_state = self.tetris_app.get_state()
-
+      
       self.set_board(cur_state["board"])
       self.set_stone(cur_state["stone"], cur_state["stone_x"], cur_state["stone_y"])
-  
+      
+      
       if not cur_state["needs_actions"]:
         continue
 
       actions = []
-
+      
+      
       if cur_state["gameover"] and training:
         self.load_next_unit( cur_state["score"], cur_state["lines"] )
+        num_stones = 0
         actions.append("space")
-        
-     
-  
-      
+       
       if cur_state["gameover"] and training==False:
           print("lines cleared: ", cur_state["lines"])
           print("score: ", cur_state["score"])
           break
+      
       possible_boards = self.get_possible_boards()
       board_scores = self.get_board_scores(possible_boards)
       actions.extend(self.get_actions_from_scores(board_scores))
-  
+     
       self.tetris_app.add_actions(actions)
+      if num_stones <= self.max_stones:
+        num_stones +=1
+      if num_stones > self.max_stones:
+        print("stone limit reached")
+        self.tetris_app.set_gameover()
+        #num_stones = 0
+        #self.load_next_unit( cur_state["score"], cur_state["lines"] )
 
 
     #self.make_move()
@@ -409,22 +418,24 @@ class TetrisAI(object):
   mutation_val = the range for which a gene can be mutated
   seed = If you want to test a specific gene
   '''
-  def start(self, num_units=50, max_gen=30, mutation_val=0.05, seed=False):
+  def start(self, num_units=50, max_gen=30, max_stones=math.inf, mutation_val=0.05, seed=False):
 
     if seed:
       if not (isinstance(seed, tuple) or len(seed) != len(self.features)):
         raise ValueError('Seed not properly formatted. Make sure it is a tuple and has {} elements').format(len(self.features))
       self.load_weights(seed)
+      self.max_stones = max_stones
       self.make_move(training=False) 
-      
     else:
       self.num_units = num_units
+      self.max_gen = max_gen
+      self.max_stones = max_stones
       self.gen_weights = OrderedDict()
       self.cur_gen = 1
-      self.cur_unit = -1
+      self.cur_unit = 0
       self.mutation_val = mutation_val
   
-      for i in range(num_units * 10):
+      for i in range(num_units * 1):
         self.gen_weights[ self.random_weights() ] = 0
   
       self.load_next_unit(0, 0)
@@ -434,16 +445,13 @@ class TetrisAI(object):
   '''
   Saves data from previous geneartion, preforms selection, crossover, and mutation
   '''
-  def new_generation(self):
+  def new_generation(self, weight_values):
 
-    weight_values = sorted( enumerate(self.gen_weights.values()), key= lambda x:x[1], reverse=True)
-    print("\n\n")
-    gen_score = sum(x[1] for x in weight_values)/len(weight_values)
-    f.write("Generation {} score: {}\n".format(self.cur_gen,gen_score))
-    print("Generation Score: ", gen_score )
+    
+    self.cur_gen += 1 
+    
     print("New Generation") 
     print("\n\n")
-    self.cur_gen += 1   
 
     gen_keys = list(self.gen_weights.keys())
     new_gen = []
@@ -518,20 +526,32 @@ class TetrisAI(object):
   # load a gene into the ai to be used for Tetris
   def load_next_unit(self, score, lines):
 
-    if self.cur_unit >= 0:
-      cur_unit = list(self.gen_weights.keys())[self.cur_unit]
-      self.gen_weights[cur_unit] = score
+    if self.cur_unit > 0 and self.cur_unit < len(self.gen_weights):
+      cur_weight = list(self.gen_weights.keys())[self.cur_unit]
+      self.gen_weights[cur_weight] = score
       print("Gen: ", self.cur_gen,"|| Unit: ", self.cur_unit)
-      print("weights:", cur_unit)
+      print("weights:", cur_weight)
       print("lines cleared: ", lines)
       print("score: ", score)
       print("--------------------------------------------------")
 
     self.cur_unit += 1
-    if self.cur_unit >= len(self.gen_weights):
-      self.new_generation()
+    if self.cur_unit < len(self.gen_weights):
+        new_unit = list(self.gen_weights.keys())[self.cur_unit]
+        self.load_weights(new_unit)
+    elif self.cur_unit == len(self.gen_weights):
+        weight_values = sorted( enumerate(self.gen_weights.values()), key= lambda x:x[1], reverse=True)
+        print("\n\n")
+        gen_score = sum(x[1] for x in weight_values)/len(weight_values)
+        f.write("Generation {} score: {}\n".format(self.cur_gen,gen_score))
+        print("Generation Score: ", gen_score )
+        while self.cur_gen < self.max_gen:
+            self.new_generation(weight_values)
     else:
-      new_unit = list(self.gen_weights.keys())[self.cur_unit]
-      self.load_weights(new_unit)
-
+        print("Done playing tetris")
+        sys.exit()
+    
+      
+    
+    
 

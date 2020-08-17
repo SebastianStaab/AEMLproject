@@ -377,6 +377,9 @@ Press space to continue""" % self.score)
             "gameover": self.gameover,
             "needs_actions": self.needs_actions}
 
+  def set_gameover(self):
+    self.gameover = True
+
   def add_actions(self, new_actions):
     self.needs_actions = False
     self.actions = new_actions
