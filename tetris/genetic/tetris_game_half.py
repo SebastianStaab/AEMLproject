@@ -45,9 +45,9 @@ import pygame, sys, numpy, math, time
 config = {
   'cell_size':  20,
   'cols':    10,
-  'rows':    24,
+  'rows':    12, #10 rows to play, and space to generate the new stone.
   'delay':  5,
-  'maxfps':  math.inf
+  'maxfps': 5
 }
 
 colors = [
@@ -145,9 +145,6 @@ class TetrisApp(object):
   checks if collision - if yes game over
   '''  
   def new_stone(self):
-    # every stone increases score (fitness)
-    self.score += 1
-
     self.stone = tetris_shapes[rand(len(tetris_shapes))]
     self.stone_x = int(config['cols'] / 2 - len(self.stone[0])/2)
     self.stone_y = 0
@@ -222,11 +219,11 @@ class TetrisApp(object):
     self.show_score(str(self.score))
 
   def add_cl_lines(self, n):
-    linescores = [0, 40, 100, 300, 1200]
-    self.lines += n
-    self.score += linescores[n]
-      
-      
+      linescores = [0, 40, 100, 300, 1200]
+      self.lines += n
+      self.score += linescores[n]
+        
+
   # move a piece horizontally
   def move(self, delta_x):
     if not self.gameover and not self.paused:
@@ -253,31 +250,7 @@ class TetrisApp(object):
         1. add stone to board
         2. create new piece
         3. Check for row completion
-  
-  def drop(self):
-    if not self.gameover and not self.paused:
-      self.stone_y += 1
-      if check_collision(self.board,
-                         self.stone,
-                         (self.stone_x, self.stone_y)):
-        self.board = join_matrixes(
-          self.board,
-          self.stone,
-          (self.stone_x, self.stone_y))
-        self.new_stone()
-        self.needs_actions = True
-        cleared_rows = 0
-        while True:
-          for i, row in enumerate(self.board[:-1]):
-            if 0 not in row:
-              cleared_rows += 1
-              self.board = remove_row(
-                self.board, i)
-              break
-          else:
-            break
-        self.add_cl_lines(cleared_rows)
-       ''' 
+  ''' 
   def drop(self):
     if not self.gameover and not self.paused:
       while True:
@@ -303,7 +276,7 @@ class TetrisApp(object):
         else:
           break
       self.add_cl_lines(cleared_rows)
-
+ 
   '''
     Rotate stone if no collision
   ''' 
@@ -350,8 +323,8 @@ class TetrisApp(object):
     while 1:
       self.screen.fill((0,0,0))
       if self.gameover:
-        self.center_msg("""Game Over!
-Press space to continue""")
+        self.center_msg("""Game Over!\nYour score: %d
+Press space to continue""" % self.score)
         self.needs_actions = True
       else:
         if self.paused:
@@ -400,6 +373,7 @@ Press space to continue""")
             "stone_x": self.stone_x,
             "stone_y": self.stone_y,
             "score": self.score,
+            "lines": self.lines,
             "gameover": self.gameover,
             "needs_actions": self.needs_actions}
 

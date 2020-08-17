@@ -1,7 +1,7 @@
 
 # tetris game and AI
 #from tetris import TetrisApp
-from tetris_trainer import TetrisApp
+from tetris_game_half import TetrisApp
 from tetris_ai import TetrisAI
 from multiprocessing import Process
 
@@ -38,8 +38,8 @@ ai = TetrisAI(app)
 
 threading.Thread(target=app.run).start()
 
-#ai.start(20, seed=(-0.178, -0.525, -0.198, -0.284, -0.685, 0.873))
-ai.start(20)
+ai.start(seed=(-0.525, -0.284, -0.685, 0.873))
+#ai.start(20)
 
 
 

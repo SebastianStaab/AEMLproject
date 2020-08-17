@@ -110,11 +110,16 @@ class TetrisAI(object):
       actions = []
 
       if cur_state["gameover"] and training:
-        self.load_next_unit( cur_state["score"] )
+        self.load_next_unit( cur_state["score"], cur_state["lines"] )
         actions.append("space")
-
- 
+        
+     
   
+      
+      if cur_state["gameover"] and training==False:
+          print("lines cleared: ", cur_state["lines"])
+          print("score: ", cur_state["score"])
+          break
       possible_boards = self.get_possible_boards()
       board_scores = self.get_board_scores(possible_boards)
       actions.extend(self.get_actions_from_scores(board_scores))
@@ -404,13 +409,14 @@ class TetrisAI(object):
   mutation_val = the range for which a gene can be mutated
   seed = If you want to test a specific gene
   '''
-  def start(self, num_units, mutation_val=0.05, seed=False):
+  def start(self, num_units=50, max_gen=30, mutation_val=0.05, seed=False):
 
     if seed:
       if not (isinstance(seed, tuple) or len(seed) != len(self.features)):
         raise ValueError('Seed not properly formatted. Make sure it is a tuple and has {} elements').format(len(self.features))
       self.load_weights(seed)
       self.make_move(training=False) 
+      
     else:
       self.num_units = num_units
       self.gen_weights = OrderedDict()
@@ -421,7 +427,7 @@ class TetrisAI(object):
       for i in range(num_units * 10):
         self.gen_weights[ self.random_weights() ] = 0
   
-      self.load_next_unit(0)
+      self.load_next_unit(0, 0)
   
       self.make_move()
 
@@ -510,14 +516,15 @@ class TetrisAI(object):
     return new_gene
 
   # load a gene into the ai to be used for Tetris
-  def load_next_unit(self, score):
+  def load_next_unit(self, score, lines):
 
     if self.cur_unit >= 0:
       cur_unit = list(self.gen_weights.keys())[self.cur_unit]
       self.gen_weights[cur_unit] = score
       print("Gen: ", self.cur_gen,"|| Unit: ", self.cur_unit)
-      print("lines cleared: ", score) 
-      print("Weights:", cur_unit)
+      print("weights:", cur_unit)
+      print("lines cleared: ", lines)
+      print("score: ", score)
       print("--------------------------------------------------")
 
     self.cur_unit += 1
