@@ -38,8 +38,8 @@ ai = TetrisAI(app)
 
 threading.Thread(target=app.run).start()
 
-ai.start(max_stones=200, seed=(-0.525, -0.284, -0.685, 0.873))
-#ai.start(num_units=20, max_gen=2)
+#ai.start(max_stones=200, seed=(-0.525, -0.284, -0.685, 0.873), target_file="data.csv")
+ai.start(num_units=20, max_gen=10, cross_selec_ratio=0.2)
 
 
 

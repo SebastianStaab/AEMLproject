@@ -1,7 +1,7 @@
 
 
 from collections import defaultdict, OrderedDict
-import pygame, numpy, time, threading, random, sys, math
+import pygame, numpy, random, sys, math, csv, re
 
 # Rotates a shape clockwise
 def rotate_clockwise(shape):
@@ -32,7 +32,8 @@ def join_matrixes(mat1, mat2, mat2_off):
         print("out of bounds join")
   return mat1
 
-f = open("Data.txt", "w+")
+
+    
 
 '''
   TetriAI
@@ -111,7 +112,7 @@ class TetrisAI(object):
 
       actions = []
       
-      
+     
       if cur_state["gameover"] and training:
         self.load_next_unit( cur_state["score"], cur_state["lines"] )
         num_stones = 0
@@ -120,20 +121,25 @@ class TetrisAI(object):
       if cur_state["gameover"] and training==False:
           print("lines cleared: ", cur_state["lines"])
           print("score: ", cur_state["score"])
-          break
+          break  
+      
+      
       
       possible_boards = self.get_possible_boards()
       board_scores = self.get_board_scores(possible_boards)
       actions.extend(self.get_actions_from_scores(board_scores))
      
       self.tetris_app.add_actions(actions)
+      
       if num_stones <= self.max_stones:
         num_stones +=1
+        
       if num_stones > self.max_stones:
         print("stone limit reached")
         self.tetris_app.set_gameover()
-        #num_stones = 0
-        #self.load_next_unit( cur_state["score"], cur_state["lines"] )
+      
+      
+        
 
 
     #self.make_move()
@@ -418,8 +424,9 @@ class TetrisAI(object):
   mutation_val = the range for which a gene can be mutated
   seed = If you want to test a specific gene
   '''
-  def start(self, num_units=50, max_gen=30, max_stones=math.inf, mutation_val=0.05, seed=False):
-
+  def start(self, num_units=50, max_gen=30, max_stones=math.inf,elitism_rate=0.3,cross_selec_ratio=0.8 , mutation_val=0.05, target_file= "data.csv", seed=False):
+    
+        
     if seed:
       if not (isinstance(seed, tuple) or len(seed) != len(self.features)):
         raise ValueError('Seed not properly formatted. Make sure it is a tuple and has {} elements').format(len(self.features))
@@ -427,12 +434,21 @@ class TetrisAI(object):
       self.max_stones = max_stones
       self.make_move(training=False) 
     else:
+      self.target_file = target_file
+      if not bool(re.search(r".+(\.csv)$", target_file)):
+          raise ValueError("target file has to be a csv file and has to be given as a string")
       self.num_units = num_units
       self.max_gen = max_gen
       self.max_stones = max_stones
+      self.elitism_rate = elitism_rate
+      self.cross_selec_ratio = cross_selec_ratio
+      if elitism_rate or cross_selec_ratio not in numpy.arange(0 ,1, 0.1):
+          raise ValueError("rates have to be a float bewteen [0,1] (stepsize 0.1)")
+      self.gen_scores = []
+      self.info = []
       self.gen_weights = OrderedDict()
       self.cur_gen = 1
-      self.cur_unit = 0
+      self.cur_unit = -1
       self.mutation_val = mutation_val
   
       for i in range(num_units * 1):
@@ -448,17 +464,15 @@ class TetrisAI(object):
   def new_generation(self, weight_values):
 
     
-    self.cur_gen += 1 
-    
     print("New Generation") 
     print("\n\n")
 
     gen_keys = list(self.gen_weights.keys())
     new_gen = []
 
-    # selection
-    selected_units = [ gen_keys[tup[0]] for tup in weight_values[:self.num_units//len(self.board[0])] ]
-     
+    # elitism selection
+    selected_units = [ gen_keys[tup[0]] for tup in weight_values[:int(round(self.num_units*self.elitism_rate))] ]
+    
     # crossover
     for i in range( len(selected_units)-1 ):
       unit1 = selected_units[i]
@@ -470,7 +484,7 @@ class TetrisAI(object):
       new_gen.append( new_unit2 ) 
       
     self.gen_weights = OrderedDict()
-    self.cur_unit = -1
+    self.cur_unit = 0
 
     for new_unit in new_gen:
       self.gen_weights[ new_unit ] = 0
@@ -478,7 +492,7 @@ class TetrisAI(object):
     # mutation
     while len(self.gen_weights) < self.num_units:
       self.gen_weights[ self.mutate_gene( random.choice(new_gen) ) ] = 0
-
+    print(len(self.gen_weights))
 
   def mix_genes(self, gene1, gene2):
     if(len(gene1) != len(gene2)):
@@ -525,8 +539,9 @@ class TetrisAI(object):
 
   # load a gene into the ai to be used for Tetris
   def load_next_unit(self, score, lines):
-
-    if self.cur_unit > 0 and self.cur_unit < len(self.gen_weights):
+    
+    # evaluate current unit
+    if self.cur_unit in range(0,len(self.gen_weights)):
       cur_weight = list(self.gen_weights.keys())[self.cur_unit]
       self.gen_weights[cur_weight] = score
       print("Gen: ", self.cur_gen,"|| Unit: ", self.cur_unit)
@@ -534,24 +549,67 @@ class TetrisAI(object):
       print("lines cleared: ", lines)
       print("score: ", score)
       print("--------------------------------------------------")
+      self.info.append([self.cur_gen, self.cur_unit, cur_weight, lines, score])
+      
 
     self.cur_unit += 1
+    
+    # create new unit in current generation
     if self.cur_unit < len(self.gen_weights):
         new_unit = list(self.gen_weights.keys())[self.cur_unit]
         self.load_weights(new_unit)
+        
+    # evaluate current generation and create new generation  
     elif self.cur_unit == len(self.gen_weights):
         weight_values = sorted( enumerate(self.gen_weights.values()), key= lambda x:x[1], reverse=True)
         print("\n\n")
         gen_score = sum(x[1] for x in weight_values)/len(weight_values)
-        f.write("Generation {} score: {}\n".format(self.cur_gen,gen_score))
-        print("Generation Score: ", gen_score )
-        while self.cur_gen < self.max_gen:
+        self.gen_scores.append(gen_score)
+        print("Generation Scores:", self.gen_scores)
+        
+        # termination condition: no progress between the last three generations
+        if len(self.gen_scores) >= 3:
+            for i in range(len(self.gen_scores)-2):
+                if self.gen_scores[i] * 1.05 >  self.gen_scores[i+1] and self.gen_scores[i+1] * 1.05 >  self.gen_scores[i+2]:
+                    print("No more progress")
+                    # csv writer
+                    f = open(self.target_file, "w")
+                    with f:
+                        writer = csv.writer(f)
+                        for row in self.info:
+                            writer.writerow(row) 
+                    sys.exit()
+                    
+        # create new generation if max generation is not reached yet           
+        if self.cur_gen < self.max_gen:
+            self.cur_gen += 1
             self.new_generation(weight_values)
+            
+        # termination condition: reached max generation
+        else:
+            print("Done playing tetris")
+            # csv writer
+            f = open(self.target_file, "w")
+            with f:
+                writer = csv.writer(f)
+                for row in self.info:
+                    writer.writerow(row) 
+            sys.exit()
+    
     else:
-        print("Done playing tetris")
+        print("Something went wrong, unit count to high")
         sys.exit()
-    
+        # csv writer
+        """
+        f = open(self.target_file, "w")
+        with f:
+            writer = csv.writer(f)
+            for row in self.info:
+              writer.writerow(row) 
+        sys.exit()
+        """
       
-    
+
+   
     
 
