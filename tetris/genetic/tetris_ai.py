@@ -121,6 +121,13 @@ class TetrisAI(object):
       if cur_state["gameover"] and training==False:
           print("lines cleared: ", cur_state["lines"])
           print("score: ", cur_state["score"])
+          self.info.append([cur_state["lines"], cur_state["score"]])
+          num_stones = 0
+          actions.append("space")
+          self.tetris_app.add_actions(actions)
+          while len(self.info)<20:
+              self.load_weights(self.seed)
+              self.make_move(training=False)
           break  
       
       
@@ -424,15 +431,22 @@ class TetrisAI(object):
   mutation_val = the range for which a gene can be mutated
   seed = If you want to test a specific gene
   '''
-  def start(self, num_units=50, max_gen=30, max_stones=math.inf,elitism_rate=0.3,cross_selec_ratio=0.8 , mutation_val=0.05, target_file= "data.csv", seed=False):
+  def start(self, num_units=50, max_gen=30, max_stones=math.inf,elitism_rate=0.3, crossover_rate=0.4, mutation_val=0.05, target_file= "data.csv", seed=False):
     
         
     if seed:
       if not (isinstance(seed, tuple) or len(seed) != len(self.features)):
         raise ValueError('Seed not properly formatted. Make sure it is a tuple and has {} elements').format(len(self.features))
-      self.load_weights(seed)
+      self.seed=seed
       self.max_stones = max_stones
-      self.make_move(training=False) 
+      self.info =[]
+      self.load_weights(seed)
+      self.make_move(training=False)
+      print(self.info)
+      avg_lines =sum(x[0] for x in self.info)/len(self.info)
+      avg_score = sum(x[1] for x in self.info)/len(self.info)
+      print("avg. number of lines cleared:", avg_lines)
+      print("avg. score:", avg_score)
     else:
       self.target_file = target_file
       if not bool(re.search(r".+(\.csv)$", target_file)):
@@ -441,8 +455,8 @@ class TetrisAI(object):
       self.max_gen = max_gen
       self.max_stones = max_stones
       self.elitism_rate = elitism_rate
-      self.cross_selec_ratio = cross_selec_ratio
-      if elitism_rate or cross_selec_ratio not in numpy.arange(0 ,1, 0.1):
+      self.crossover_rate = crossover_rate
+      if not elitism_rate*10 in range(0 ,10) or not crossover_rate*10 in range(0 ,10):
           raise ValueError("rates have to be a float bewteen [0,1] (stepsize 0.1)")
       self.gen_scores = []
       self.info = []
@@ -468,31 +482,44 @@ class TetrisAI(object):
     print("\n\n")
 
     gen_keys = list(self.gen_weights.keys())
-    new_gen = []
-
-    # elitism selection
-    selected_units = [ gen_keys[tup[0]] for tup in weight_values[:int(round(self.num_units*self.elitism_rate))] ]
     
-    # crossover
+    # create a weights and a candidates list (pre-ordered)
+    candidates = [ gen_keys[tup[0]] for tup in weight_values]
+    weights = []
+    for i in range(len(weight_values)):
+        weights.append(weight_values[i][1])
+        
+    
+    # elitism selection: select the top x% candidates and (a) take them directly to the new generation
+    new_gen = []
+    selected_units = candidates[:int(round(self.num_units*self.elitism_rate))]
     for i in range( len(selected_units)-1 ):
-      unit1 = selected_units[i]
-      unit2 = selected_units[i+1]
-
-      new_unit1, new_unit2 = self.mix_genes(unit1, unit2)
-
-      new_gen.append( new_unit1 ) 
-      new_gen.append( new_unit2 ) 
-      
+        new_gen.append(selected_units[i])
+    
+    # add the selected genes to the new gen_weights (new generation)
     self.gen_weights = OrderedDict()
+    for new_unit in new_gen:
+        self.gen_weights[ new_unit ] = 0
+    
+    # crossover: fill up the next part of the new generation with candidates - passed on
+    # via crossover from the weighted candidates (while preventing duplicated candidates)
+    while len(self.gen_weights) < self.num_units*(self.elitism_rate+self.crossover_rate):
+      
+      unit1, unit2 = random.choices(candidates,weights , k=2)
+      new_unit1, new_unit2 = self.mix_genes(unit1, unit2)
+      
+      # add the new genes to gen_weights
+      self.gen_weights[new_unit1] = 0
+      self.gen_weights[new_unit2] = 0
+    
+    # mutation:
+    gen_so_far = list(self.gen_weights.keys())
+    while len(self.gen_weights) < self.num_units:
+        self.gen_weights[self.mutate_gene(random.choice(gen_so_far))] = 0
+    
+    # set the unit count back to zero
     self.cur_unit = 0
 
-    for new_unit in new_gen:
-      self.gen_weights[ new_unit ] = 0
-
-    # mutation
-    while len(self.gen_weights) < self.num_units:
-      self.gen_weights[ self.mutate_gene( random.choice(new_gen) ) ] = 0
-    print(len(self.gen_weights))
 
   def mix_genes(self, gene1, gene2):
     if(len(gene1) != len(gene2)):
@@ -520,11 +547,6 @@ class TetrisAI(object):
 
 
     num_features = len(self.features)
-
-    # try for mutation with 5% change of success
-    if random.randint(0,100) > self.mutation_val:
-      return gene
-
     genes_to_mutate = numpy.random.choice( range(num_features), random.randint(0, num_features), replace=False )
 
     new_gene = ()
@@ -534,7 +556,7 @@ class TetrisAI(object):
       if i in genes_to_mutate:
         mut_val = random.uniform(-self.mutation_val, self.mutation_val)
       new_gene = new_gene + ( gene[i] + mut_val,)
-
+      
     return new_gene
 
   # load a gene into the ai to be used for Tetris
@@ -599,15 +621,7 @@ class TetrisAI(object):
     else:
         print("Something went wrong, unit count to high")
         sys.exit()
-        # csv writer
-        """
-        f = open(self.target_file, "w")
-        with f:
-            writer = csv.writer(f)
-            for row in self.info:
-              writer.writerow(row) 
-        sys.exit()
-        """
+        
       
 
    
