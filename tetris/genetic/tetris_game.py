@@ -35,12 +35,10 @@
 # THE SOFTWARE.
 
 
-'''
-This script is used to quickly train and get genes to then apply to the normal tetris
-'''
+### This version is modified a little to fit to the ai and allow all operations I needed.
 
 from random import randrange as rand
-import pygame, sys, numpy, math, time
+import pygame, sys, numpy, math
 # The configuration
 config = {
   'cell_size':  20,
@@ -319,7 +317,6 @@ class TetrisApp(object):
    
     #Timer to handle drop
     pygame.time.set_timer(pygame.USEREVENT+1, config['delay'])
-    dont_burn_my_cpu = pygame.time.Clock()
     while 1:
       self.screen.fill((0,0,0))
       if self.gameover:
@@ -335,18 +332,6 @@ Press space to continue""" % self.score)
                            (self.stone_x,
                             self.stone_y))
       pygame.display.update()
-     
-      # check for events 
-      '''for event in pygame.event.get():
-        #if event.type == pygame.USEREVENT+1:
-          #self.drop()
-        if event.type == pygame.QUIT:
-          self.quit()
-        elif event.type == pygame.KEYDOWN:
-          for key in key_actions:
-            if event.key == eval("pygame.K_"
-            +key):
-              key_actions[key]()'''
 
 
       for action in self.actions:
@@ -358,14 +343,6 @@ Press space to continue""" % self.score)
       if not self.needs_actions:
         self.drop()
 
-      '''if( len(self.actions)>0 ):
-        action = self.actions[0].upper()
-        if action in key_actions:
-          key_actions[action]()
-          self.actions.pop(0)'''
-        
-          
-      #dont_burn_my_cpu.tick(config['maxfps'])
 
   def get_state(self):
     return {"board": numpy.copy(self.board), 

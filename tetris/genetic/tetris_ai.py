@@ -35,9 +35,7 @@ def join_matrixes(mat1, mat2, mat2_off):
 
     
 
-'''
-  TetriAI
-'''
+### Tetris AI
 class TetrisAI(object):
   
   def __init__(self, tetris_app):
@@ -46,8 +44,7 @@ class TetrisAI(object):
 
     self.screen = pygame.display.set_mode((200, 480 ))
 
-    ''' set fetures wanted here MAKE SURE TO CHANGE FUNCTIONS FOR EVALUATION BELOW'''
-    #self.features = ("max_height", "cumulative_height", "relative_height", "roughness", "hole_count", "rows_cleared")
+    # set fetures wanted here 
     self.features = ("cumulative_height", "roughness", "hole_count", "rows_cleared")
 
   def draw_matrix(self, matrix, offset, color=(255,255,255)):
@@ -66,10 +63,7 @@ class TetrisAI(object):
               20,
               20),0)
 
-  '''
-    Getters and setters
-  '''
-
+# Getters and Setters
   def set_weights(self, weight_dict):
     self.weights = defaultdict(int, weight_dict)
 
@@ -93,12 +87,20 @@ class TetrisAI(object):
 
     return (self.stone, self.stone_x, self.stone_y)
 
-  '''
-    Keyboard/Action controller
-  '''
+  
 
   def make_move(self, num_stones=0, training=True):
-    
+    """
+      Action Control, decides which moves to make, and how to go on after the game is finished
+      (either by gameover of after a maximal number of stones is reached)
+
+      Parameters
+      ----------
+      num_stones : int, optional
+          stone count to account for a maximal stone number per game. The default is 0.
+      training : boolean, optional
+          to decide wether we want to train, or to test a specific seed. The default is True.
+    """
     while True:
       
       cur_state = self.tetris_app.get_state()
@@ -112,15 +114,14 @@ class TetrisAI(object):
 
       actions = []
       
-     
+      # if gameover is reached, start with next unit
       if cur_state["gameover"] and training:
         self.load_next_unit( cur_state["score"], cur_state["lines"] )
         num_stones = 0
         actions.append("space")
        
+      # for testing specific seeds: play the game 20 times with the same seed  
       if cur_state["gameover"] and training==False:
-          print("lines cleared: ", cur_state["lines"])
-          print("score: ", cur_state["score"])
           self.info.append([cur_state["lines"], cur_state["score"]])
           num_stones = 0
           actions.append("space")
@@ -131,29 +132,24 @@ class TetrisAI(object):
           break  
       
       
-      
+      # check all possible moves and chose the best
       possible_boards = self.get_possible_boards()
       board_scores = self.get_board_scores(possible_boards)
       actions.extend(self.get_actions_from_scores(board_scores))
      
       self.tetris_app.add_actions(actions)
       
+      # count the stones
       if num_stones <= self.max_stones:
         num_stones +=1
-        
+      
+      # termination condition: if we reach max_stones
       if num_stones > self.max_stones:
         print("stone limit reached")
         self.tetris_app.set_gameover()
       
-      
-        
 
 
-    #self.make_move()
-    
-  '''
-    Actual AI stuff
-  '''
 
   # move a piece horizontally
   def move(self, desired_x, board, stone, stone_x, stone_y):
@@ -171,9 +167,7 @@ class TetrisAI(object):
         break
     return stone_x
  
-  '''
-    Rotate stone if no collision
-  ''' 
+# rotate a stone if no collision
   def rotate_stone(self, board, stone, stone_x, stone_y):
 
     new_stone = rotate_clockwise(stone)
@@ -183,14 +177,9 @@ class TetrisAI(object):
       return new_stone
     return stone
 
-  '''
-    (Modified)
-    Try moving piece down
-      - if collision:
-        1. add stone to board
-        2. Check for row completion
-        3. if no collision drop again
-  ''' 
+ 
+  # drop piece downwards as long as no collision occurs. 
+  # If collision: add stone to board, check for row completion.
   def drop(self, board, stone, stone_x, stone_y):
 
     stone_y += 1
@@ -205,6 +194,7 @@ class TetrisAI(object):
       self.drop(board, stone, stone_x, stone_y)
     return board, stone_y
 
+# get all possible boards
   def get_possible_boards(self):
     if not (hasattr(self, "board") and hasattr(self, "stone")):
       raise ValueError("either board or stone do not exist for TetrisAI")
@@ -216,8 +206,6 @@ class TetrisAI(object):
 
     temp_board = numpy.copy(self.board)
     temp_stone = numpy.copy(self.stone)
-
-    temper = numpy.copy(temp_stone)
 
     temp_x = self.stone_x
     temp_y = self.stone_y
@@ -242,15 +230,9 @@ class TetrisAI(object):
 
       temp_stone = self.rotate_stone(temp_board, temp_stone, temp_x, temp_y)
 
-
-    
-    '''self.stone = temp_stone
-    self.board = temp_board
-    self.stone_x = temp_x
-    self.stone_y = temp_y'''
-
     return boards
 
+  # get the scores of all possible boards
   def get_board_scores(self, boards):
     scores = []
 
@@ -260,10 +242,11 @@ class TetrisAI(object):
 
     return scores 
 
+  # decide which option to choose from all possible boards
   def get_actions_from_scores(self, scores):
     actions = []
 
-    # CHANGE THIS LATER
+    # best score
     best_score = scores.index( max(scores) )
 
     # rotate to proper orientation
@@ -292,63 +275,42 @@ class TetrisAI(object):
 
     return actions
 
+  # evaluate boards, fitness function (linear)
   def eval_board(self, board):
 
     if not (hasattr(self, "weights")):
       raise ValueError("TetrisAI has no weights")
 
 
-    ''' Make sure these function reflect the features you are using above '''
+    # all features in a linear function
     score = []
-    #score.append( self.get_max_height(board) * self.weights["max_height"])
     score.append( self.get_cumulative_height(board) * self.weights["cumulative_height"])
-    #score.append( self.get_relative_height(board) * self.weights["relative_height"])
     score.append( self.get_roughness(board) * self.weights["roughness"])
     score.append( self.get_hole_count(board) * self.weights["hole_count"])
     score.append( self.get_rows_cleared(board) * self.weights["rows_cleared"])
 
     return sum(score)
 
-  '''
-    Gets the height of each column
-  '''
+  #get height of a column
   def get_column_heights(self, board):
     # get the hights of each column
-    heghts = [0 for i in board[0]] 
+    heights = [0 for i in board[0]] 
 
     for y, row in enumerate(board[::-1]):
       for x, val in enumerate(row):
         if val != 0:
-          heghts[x] = y
+          heights[x] = y
     
-    return heghts
+    return heights
 
-  '''
-    Find max height in board
-  '''
-  def get_max_height(self, board):
-    return max(self.get_column_heights(board))
 
-  '''
-    Gets the sum of all the columns
-  '''
+  # get sum of all column heights
   def get_cumulative_height(self, board):
     return sum(self.get_column_heights(board))
 
-  '''
-    Gets the difference betweent he shortest and tallest height
-  '''
-  def get_relative_height(self, board):
-    column_heights= self.get_column_heights(board)
-    max_height = max(column_heights)
-    min_height = min(column_heights)
-    return max_height - min_height
 
-  '''
-    Get roughness
-      determined by summing the hight
-      absolute difference between a row at i and i+1
-  '''
+
+  # get roughness of the board (sum of the differences in height of neighboring columns)
   def get_roughness(self, board):
 
     levels = self.get_column_heights(board)
@@ -361,11 +323,7 @@ class TetrisAI(object):
 
     return roughness
 
-  '''
-    Get's the number of spaces which are un reacable
-      A space is un reachable if there is another piece above it
-      even if you could slip the piece in from the side
-  '''
+  # get the number of holes (tile above has to be blocked)
   def get_hole_count(self, board):
     levels = self.get_column_heights(board) 
 
@@ -379,9 +337,7 @@ class TetrisAI(object):
 
     return holes
 
-  '''
-    Check how many rows will be cleared in this config
-  '''
+  # count the number of rows cleared
   def get_rows_cleared(self, board):
     # starts at -1 to account for bottom row which
     # is always all 1
@@ -394,15 +350,11 @@ class TetrisAI(object):
     return rows_cleared 
 
 
-  '''
-    genetic algorithm code
-  '''
+### GENETIC ALGORITHM
 
 
-  '''
-  Creates a gene with random weights
-  if seeded it creates the weights based off the seeded gene
-  '''
+  #Creates a gene with random weights (between -1 and 1)
+  #If seeded: It creates the weights based off the seeded gene with a certain variation 
   def random_weights(self, seeded=False):
    
     weights = ()
@@ -416,7 +368,8 @@ class TetrisAI(object):
       weights = weights + (random.uniform(-1, 1),)
  
     return weights
-
+  
+  # load weights
   def load_weights(self, weight_tuple):
     self.weights = dict()
 
@@ -424,16 +377,34 @@ class TetrisAI(object):
       self.weights[f] = weight_tuple[fn]
       
 
-  '''
-  Creates the initial population (10 times the going on population) and starts running
-
-  num_units = the number of genes per generation (the initial generation is 10 times this value)
-  mutation_val = the range for which a gene can be mutated
-  seed = If you want to test a specific gene
-  '''
   def start(self, num_units=50, max_gen=30, max_stones=math.inf,elitism_rate=0.3, crossover_rate=0.4, mutation_val=0.05, target_file= "data.csv", seed=False):
-    
-        
+    '''
+      initialize the Genetic Algorithm. The starting population is 10 times the size of num_units 
+      (=every further generation). A new generation is build by elitism selection (best candidates), 
+      crossover (from randomly chosen candidates, weighted by their score) and mutation 
+      (mutated by the mutation_val, chosen from the so far selected candidates from the new generation).
+
+      Parameters
+      ----------
+      num_units : int, optional
+          size of the popultion. The default is 50.
+      max_gen : int, optional
+          maximal number of generations. The default is 30.
+      max_stones : int, optional
+          maximal number of tetriminos that are available in each game. The default is math.inf.
+      elitism_rate : float, optional
+          rate of eltisim selection. The default is 0.3.
+      crossover_rate : float, optional
+          rate of crossover. The default is 0.4.
+      mutation_val : float, optional
+          how strong the mutation candidates are mutated. The default is 0.05.
+      target_file : string, optional
+          file direction where to save all information (generation, unit, weights, lines cleared,
+          scores). The default is "data.csv".
+      seed : tuple, optional
+          To test a specific weight set. The default is False.
+    '''
+    # if seed: test this seed in 20 games
     if seed:
       if not (isinstance(seed, tuple) or len(seed) != len(self.features)):
         raise ValueError('Seed not properly formatted. Make sure it is a tuple and has {} elements').format(len(self.features))
@@ -447,6 +418,7 @@ class TetrisAI(object):
       avg_score = sum(x[1] for x in self.info)/len(self.info)
       print("avg. number of lines cleared:", avg_lines)
       print("avg. score:", avg_score)
+    # train
     else:
       self.target_file = target_file
       if not bool(re.search(r".+(\.csv)$", target_file)):
@@ -464,17 +436,17 @@ class TetrisAI(object):
       self.cur_gen = 1
       self.cur_unit = -1
       self.mutation_val = mutation_val
-  
-      for i in range(num_units * 1):
+      
+      # starting populition with a 10 times greater size
+      for i in range(num_units * 10):
         self.gen_weights[ self.random_weights() ] = 0
-  
+      
+      # start the training
       self.load_next_unit(0, 0)
-  
       self.make_move()
 
-  '''
-  Saves data from previous geneartion, preforms selection, crossover, and mutation
-  '''
+
+  #Saves data from previous geneartion, preforms eltisim selection, crossover, and mutation
   def new_generation(self, weight_values):
 
     
@@ -512,7 +484,7 @@ class TetrisAI(object):
       self.gen_weights[new_unit1] = 0
       self.gen_weights[new_unit2] = 0
     
-    # mutation:
+    # mutation: fill up the rest of the new gen with mutated genes (chosen from the selected candidates so far)
     gen_so_far = list(self.gen_weights.keys())
     while len(self.gen_weights) < self.num_units:
         self.gen_weights[self.mutate_gene(random.choice(gen_so_far))] = 0
@@ -520,19 +492,18 @@ class TetrisAI(object):
     # set the unit count back to zero
     self.cur_unit = 0
 
-
+  # crossover function
   def mix_genes(self, gene1, gene2):
     if(len(gene1) != len(gene2)):
       raise ValueError('A very specific bad thing happened.') 
-
 
     num_features = len(self.features)
     new_genes_to_switch = numpy.random.choice( range(num_features), num_features//2, replace=False )  
 
     new_gene1 = ()
     new_gene2 = ()
-
-
+    
+    # mix the genes
     for i in range( len(gene1) ):
       if i in new_genes_to_switch:
         new_gene1 = new_gene1 + ( gene2[i], )
@@ -543,14 +514,14 @@ class TetrisAI(object):
        
     return (new_gene1, new_gene2) 
 
+  # mutation function
   def mutate_gene(self, gene):
-
 
     num_features = len(self.features)
     genes_to_mutate = numpy.random.choice( range(num_features), random.randint(0, num_features), replace=False )
-
     new_gene = ()
-
+    
+    # mutate
     for i in range(len(gene)):
       mut_val = 0 
       if i in genes_to_mutate:
@@ -581,7 +552,7 @@ class TetrisAI(object):
         new_unit = list(self.gen_weights.keys())[self.cur_unit]
         self.load_weights(new_unit)
         
-    # evaluate current generation and create new generation  
+    # evaluate current generation and create new generation if the current generation is finished
     elif self.cur_unit == len(self.gen_weights):
         weight_values = sorted( enumerate(self.gen_weights.values()), key= lambda x:x[1], reverse=True)
         print("\n\n")
@@ -589,10 +560,10 @@ class TetrisAI(object):
         self.gen_scores.append(gen_score)
         print("Generation Scores:", self.gen_scores)
         
-        # termination condition: no progress between the last three generations
-        if len(self.gen_scores) >= 3:
-            for i in range(len(self.gen_scores)-2):
-                if self.gen_scores[i] * 1.05 >  self.gen_scores[i+1] and self.gen_scores[i+1] * 1.05 >  self.gen_scores[i+2]:
+        # termination condition: no progress between the last four generations
+        if len(self.gen_scores) >= 4:
+            for i in range(len(self.gen_scores)-3):
+                if self.gen_scores[i] >  self.gen_scores[i+1] and self.gen_scores[i+1] >  self.gen_scores[i+2] and self.gen_scores[i+2] >  self.gen_scores[i+3]:
                     print("No more progress")
                     # csv writer
                     f = open(self.target_file, "w")
