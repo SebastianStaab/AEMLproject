@@ -5,7 +5,7 @@ from tetris_game_half import TetrisApp as TetrisAppHalf
 from tetris_ai import TetrisAI
 import threading
 
-
+"""
 # Half Tetris
 app = TetrisAppHalf()
 ai = TetrisAI(app)
@@ -20,7 +20,7 @@ ai = TetrisAI(app)
 
 threading.Thread(target=app.run).start()
 ai.start(max_stones=1000, num_units=200, max_gen=20,elitism_rate=0.4, crossover_rate=0.4, mutation_val=0.1, target_file="tetrislim.csv")
-"""
+
 
 
 
