@@ -1,3 +1,7 @@
+###
+# The structure of the basic python implementation for this AI is inspired by 
+# Thomas Young (https://github.com/thyo9470/Genetic-Tetris).
+# The core functions were changed to our needs, new options and functions were added.
 
 
 from collections import defaultdict, OrderedDict
